@@ -8,6 +8,7 @@ load_dotenv()
 
 # Configuration des connexions
 POSTGRES_CONFIG = {
+    
     'host': os.getenv('POSTGRES_HOST'),
     'database': os.getenv('POSTGRES_DB'),
     'user': os.getenv('POSTGRES_USER'),
@@ -85,6 +86,7 @@ def extract_restaurant_data(pg_conn):
         print(f"✗ Erreur extraction données: {e}")
         cursor.close()
         return []
+
 
 def transform_document(restaurant):
     """Transformation optionnelle du document"""
