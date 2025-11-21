@@ -1,5 +1,4 @@
 # Fichiers d'environnement (IMPORTANT - contient vos mots de passe)
-.env
 .env.local
 .env.*.local
 
