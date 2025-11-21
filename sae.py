@@ -1,5 +1,5 @@
 from pymongo import MongoClient
-client = MongoClient() 
+client = MongoClient()
 
 # Connexion à MongoDB
 try:
