@@ -1,7 +1,8 @@
 # smartNYCRestaurants
 Application Python pour localiser les restaurants à New York à partir de données PostgreSQL et MongoDB
-pobjfje
+---
 
+```json
 {   
     "address": -> geo
         {"building": "1007", "coord":{"type":"Point", "coordinates" : [-73.856077, 40.848447]}, "street": "Morris Park Ave", "zipcode": "10462"}, 
@@ -12,3 +13,5 @@ pobjfje
     "name": "Morris Park Bake Shop", -> main
     "restaurant_id": "30075445" -> main
 }
+```
+
