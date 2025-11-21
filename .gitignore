@@ -1,0 +1,36 @@
+# Fichiers d'environnement (IMPORTANT - contient vos mots de passe)
+.env
+.env.local
+.env.*.local
+
+# Fichiers Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.pyc
+
+# Environnements virtuels Python
+venv/
+env/
+ENV/
+.venv
+
+# Exports et données temporaires
+
+
+# IDE et éditeurs
+.vscode/
+.idea/
+
+.DS_Store
+
+# Logs
+*.log
+logs/
+
