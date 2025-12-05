@@ -25,5 +25,32 @@
       "distance": 24.93769223301557,
       "cuisine": "Bakery"
     }
+  ],
+  "{'longitude': -74.13, 'latitude': 40.6, 'cuisine_filter': 'Italian', 'k': 5}": [
+    {
+      "name": "Carol S Cafe",
+      "distance": 2.6104242370443886,
+      "cuisine": "Italian"
+    },
+    {
+      "name": "La Strada Restaurant",
+      "distance": 3.154281560876468,
+      "cuisine": "Italian"
+    },
+    {
+      "name": "Cafe Bella Vita",
+      "distance": 3.3650771300965907,
+      "cuisine": "Italian"
+    },
+    {
+      "name": "Nucci S Restaurant",
+      "distance": 3.714896277911758,
+      "cuisine": "Italian"
+    },
+    {
+      "name": "Cafe Luna",
+      "distance": 3.8168067290721925,
+      "cuisine": "Italian"
+    }
   ]
 }

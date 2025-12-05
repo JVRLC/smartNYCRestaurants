@@ -173,7 +173,7 @@ def show_k_nearest_restaurants(user_long, user_lat, k=5, cuisine_filter=None):
 
     print(f"\nLes {k} restaurants les plus proches ({source}, {elapsed:.4f} s) :")
     for i in range(min(k, len(distances))):
-        print(f"{i+1:>2}. {distances[i][0]:<30} - {distances[i][1]:>8.2f} km | {distances[i][2]}")
+        print(f"{i+1:>2}. {distances[i][0]:<30} - {distances[i][1]:>8} km | {distances[i][2]}")
 
     return elapsed, source
 
