@@ -1,7 +1,3 @@
-# Fchiers d'environnement (IMPORTANT - contient vos mots de passe)
-.env.local
-.env.*.local
-
 # Fichiers Python
 __pycache__/
 *.py[cod]
