@@ -109,8 +109,8 @@ restaus = collection.find({}, {'name': 1, 'address.coord': 1, 'cuisine': 1, '_id
 # print(list(restaus))
 
 def compute_distance(restaurant, user_long, user_lat, cuisine_filter=None):
-    restau_long = restaurant['address']['coord']['coordinates'][0]
-    restau_lat = restaurant['address']['coord']['coordinates'][1]
+    restau_lat = restaurant['address']['coord']['coordinates'][0]
+    restau_long = restaurant['address']['coord']['coordinates'][1]
     distance = haversine(user_long, user_lat, restau_long, restau_lat)
 
     if cuisine_filter:
