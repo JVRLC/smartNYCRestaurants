@@ -1,0 +1,29 @@
+{
+  "{'longitude': -74.0, 'latitude': 41.1, 'cuisine_filter': None, 'k': 5}": [
+    {
+      "name": "Nonis Coffee Shop",
+      "distance": 22.88314390834124,
+      "cuisine": "American "
+    },
+    {
+      "name": "Dino S Pizza",
+      "distance": 23.203174074804746,
+      "cuisine": "Pizza"
+    },
+    {
+      "name": "The Barbecue Pit",
+      "distance": 23.28894315112152,
+      "cuisine": "Barbecue"
+    },
+    {
+      "name": "Short Stop Restaurant",
+      "distance": 24.89495954369936,
+      "cuisine": "American "
+    },
+    {
+      "name": "Angelica S Bakery",
+      "distance": 24.93769223301557,
+      "cuisine": "Bakery"
+    }
+  ]
+}

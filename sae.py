@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from pymongo import MongoClient
 
 
@@ -122,44 +123,58 @@ def compute_distance(restaurant, user_long, user_lat, cuisine_filter=None):
 def show_k_nearest_restaurants(user_long, user_lat, k=5, cuisine_filter=None):
     restaus = collection.find({}, {'name': 1, 'address.coord': 1, 'cuisine': 1, '_id': 0})
     
-    cache_path = 'cache.json'
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    cache_path = os.path.join(BASE_DIR, 'cache.json')
     cache = {}
     # load cache if exists
     if os.path.exists(cache_path):
-        with open(cache_path, 'r') as f:
-            cache = json.load(f)
-    
+        try:
+            with open(cache_path, 'r') as f:
+                cache = json.load(f)
+        except json.JSONDecodeError:
+            print("[WARN] Fichier cache.json invalide, reinitialisation du cache.")
+            cache = {}
+
     user_request = {
         'longitude': user_long,
         'latitude': user_lat,
         'cuisine_filter': cuisine_filter,
         'k': k
     }
-
-    # verify if same request exists in cache
     cache_key = str(user_request)
+
+    t0 = time.perf_counter()   # debut chrono
+    print('\n')
+    
     if cache_key in cache:
-        print("[INFO] Résultats récupérés depuis le cache.")
+        source = "cache"
+        print("[INFO] Résultats récup depuis le cache.")
         user_results = cache[cache_key]
-        # Fetch results
         distances = [(res['name'], res['distance'], res['cuisine']) for res in user_results]
     else:
-        print("[INFO] Calcul des résultats...")
+        source = "mongo"
+        print("[INFO] Calcul des résultats depuis MongoDB...")
         distances = []
         for restaurant in restaus:
             distance = compute_distance(restaurant, user_long, user_lat, cuisine_filter)
             if distance is not None:
                 distances.append((restaurant['name'], distance, restaurant['cuisine']))
                 distances.sort(key=lambda x: x[1])
-        # save results
-        user_results = [{'name': name, 'distance': dist, 'cuisine': cuisine} for name, dist, cuisine in distances[:k]]
+        user_results = [
+            {'name': name, 'distance': dist, 'cuisine': cuisine}
+            for name, dist, cuisine in distances[:k]
+        ]
         cache[cache_key] = user_results
-        # update cache_path file
-        
+        with open(cache_path, 'w') as f:
+            json.dump(cache, f, indent=2)
 
-    print(f"\nLes {k} restaurants les plus proches:")
+    t1 = time.perf_counter()   # fin chrono
+    elapsed = t1 - t0
+
+    print(f"\nLes {k} restaurants les plus proches ({source}, {elapsed:.4f} s) :")
     for i in range(min(k, len(distances))):
-        # print(f"{i+1}. {distances[i][0]} - {distances[i][1]:.2f} km | {restaurant['cuisine']}")
         print(f"{i+1:>2}. {distances[i][0]:<30} - {distances[i][1]:>8.2f} km | {distances[i][2]}")
+
+    return elapsed, source
 
 show_k_nearest_restaurants(long_oe, lat_sn, k=5, cuisine_filter=cuisine_type)
