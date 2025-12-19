@@ -41,9 +41,9 @@ try:
 except Exception as e:
     print(f"[ERROR] Erreur de connexion à MongoDB: {e}")
 
-# Connexion à la collection 
-# collection = client['restau']['db']
-collection = client['tp5']['restau']
+# Connexion à la collection
+# collection = client['tp5']['restau']
+collection = client[MONGODB_CONFIG['database']][MONGODB_CONFIG['collection']]
 
 # Nb de doc:
 print(f"\nIl y a {collection.count_documents({})} documents dans la collection.")
