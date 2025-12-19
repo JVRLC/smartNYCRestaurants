@@ -120,61 +120,105 @@ def compute_distance(restaurant, user_long, user_lat, cuisine_filter=None):
             return None
     return distance
 
-def show_k_nearest_restaurants(user_long, user_lat, k=5, cuisine_filter=None):
-    restaus = collection.find({}, {'name': 1, 'address.coord': 1, 'cuisine': 1, '_id': 0})
-    
+def manage_cache(user_lat, user_long, k, cuisine_filter, new_results=None):
+    """
+    Gère le cache pour les recherches de restaurants.
+    Lecture : Vérifie si une requête similaire (+/- 0.001 lat/long) existe.
+    Tache : Ajoute les résultats. Si le cache a 20 entrées, on vide tout avant d'ajouter.
+    """
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     cache_path = os.path.join(BASE_DIR, 'cache.json')
-    cache = {}
-    # load cache if exists
+    
+    # Chargement du cache
     if os.path.exists(cache_path):
         try:
             with open(cache_path, 'r') as f:
-                cache = json.load(f)
-        except json.JSONDecodeError:
-            print("[WARN] Fichier cache.json invalide, reinitialisation du cache.")
-            cache = {}
+                cache_data = json.load(f)
+                if not isinstance(cache_data, list):
+                    cache_data = []
+        except Exception:
+            cache_data = []
+    else:
+        cache_data = []
 
-    user_request = {
-        'longitude': user_long,
-        'latitude': user_lat,
-        'cuisine_filter': cuisine_filter,
-        'k': k
-    }
-    cache_key = str(user_request)
+    # Mode Lecture (Recherche)
+    if new_results is None:
+        for entry in cache_data:
+            q = entry.get('query', {})
+            # Vérification des critères exacts
+            if q.get('k') != k or q.get('cuisine_filter') != cuisine_filter:
+                continue
+            
+            # Vérification de la tolérance géographique (+/- 0.001)
+            lat_diff = abs(q.get('latitude', 0) - user_lat)
+            long_diff = abs(q.get('longitude', 0) - user_long)
+            
+            if lat_diff <= 0.001 and long_diff <= 0.001:
+                return entry.get('results')
+        return None
 
-    t0 = time.perf_counter()   # debut chrono
-    print('\n')
+    # Mode Écriture (Mise à jour)
+    else:
+        # Politique d'éviction : si 20 lignes ou plus, on vid tout
+        if len(cache_data) >= 20:
+            cache_data = []
+        
+        new_entry = {
+            'query': {
+                'latitude': user_lat,
+                'longitude': user_long,
+                'k': k,
+                'cuisine_filter': cuisine_filter
+            },
+            'results': new_results
+        }
+        cache_data.append(new_entry)
+        
+        with open(cache_path, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+        return new_results
+
+def show_k_nearest_restos(user_long, user_lat, k=5, cuisine_filter=None):
+    t0 = time.perf_counter()
     
-    if cache_key in cache:
+    # 1. Interrogation du cache via manage_cache
+    cached_results = manage_cache(user_lat, user_long, k, cuisine_filter)
+    
+    if cached_results:
         source = "cache"
-        print("[INFO] Résultats récup depuis le cache.")
-        user_results = cache[cache_key]
-        distances = [(res['name'], res['distance'], res['cuisine']) for res in user_results]
+        print("[INFO] Résultats récupérés depuis le cache.")
+        user_results = cached_results
     else:
         source = "mongo"
         print("[INFO] Calcul des résultats depuis MongoDB...")
+        
+        # Récupération des restaurants depuis MongoDB
+        restaus = collection.find({}, {'name': 1, 'address.coord': 1, 'cuisine': 1, '_id': 0})
+        
         distances = []
         for restaurant in restaus:
             distance = compute_distance(restaurant, user_long, user_lat, cuisine_filter)
             if distance is not None:
-                distances.append((restaurant['name'], distance, restaurant['cuisine']))
-                distances.sort(key=lambda x: x[1])
-        user_results = [
-            {'name': name, 'distance': dist, 'cuisine': cuisine}
-            for name, dist, cuisine in distances[:k]
-        ]
-        cache[cache_key] = user_results
-        with open(cache_path, 'w') as f:
-            json.dump(cache, f, indent=2)
+                distances.append({
+                    'name': restaurant.get('name', 'Unknown'), 
+                    'distance': distance, 
+                    'cuisine': restaurant.get('cuisine', 'Unknown')
+                })
+        
+        # Tri et limitation à k
+        distances.sort(key=lambda x: x['distance'])
+        user_results = distances[:k]
+        
+        # 2. Mise à jour du cache via manage_cache
+        manage_cache(user_lat, user_long, k, cuisine_filter, new_results=user_results)
 
-    t1 = time.perf_counter()   # fin chrono
+    t1 = time.perf_counter()
     elapsed = t1 - t0
 
     print(f"\nLes {k} restaurants les plus proches ({source}, {elapsed:.4f} s) :")
-    for i in range(min(k, len(distances))):
-        print(f"{i+1:>2}. {distances[i][0]:<30} - {distances[i][1]:>8} km | {distances[i][2]}")
+    for i, res in enumerate(user_results):
+        print(f"{i+1:>2}. {res['name']:<30} - {res['distance']:>8} km | {res['cuisine']}")
 
     return elapsed, source
 
-show_k_nearest_restaurants(long_oe, lat_sn, k=5, cuisine_filter=cuisine_type)
+show_k_nearest_restos(long_oe, lat_sn, k=5, cuisine_filter=cuisine_type)
