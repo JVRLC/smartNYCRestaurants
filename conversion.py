@@ -1,53 +1,52 @@
 import psycopg2
 import pymongo
+from pymongo import UpdateOne
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-# Charger les variables d'environnement depuis le fichier .env
+
 load_dotenv()
 
-# Configuration des connexions
+# Config pour postgres et MongoDb
+
 POSTGRES_CONFIG = {
-    
-    'host': os.getenv('POSTGRES_HOST'),
-    'database': os.getenv('POSTGRES_DB'),
-    'user': os.getenv('POSTGRES_USER'),
-    'password': os.getenv('POSTGRES_PASSWORD')
+    "host": os.getenv("POSTGRES_HOST"),
+    "database": os.getenv("POSTGRES_DB"),
+    "user": os.getenv("POSTGRES_USER"),
+    "password": os.getenv("POSTGRES_PASSWORD")
 }
 
 MONGODB_CONFIG = {
-    'host': os.getenv('MONGO_HOST'),
-    'port': 27017,
-    'database': os.getenv('MONGO_DB'),
-    'collection': os.getenv('COLLECTION_NAME')
+    "host": os.getenv("MONGO_HOST"),
+    "port": 27017,
+    "database": os.getenv("MONGO_DB"),
+    "collection": os.getenv("COLLECTION_NAME")
 }
 
+# Connexion
+
 def connect_postgres():
-    """Connexion à PostgreSQL"""
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
-        print("Connexion PostgreSQL établie")
-        return conn
+        return psycopg2.connect(**POSTGRES_CONFIG)
     except Exception as e:
-        print(f"Erreur connexion PostgreSQL: {e}")
+        print(e)
         return None
 
 def connect_mongodb():
-    """Connexion à MongoDB"""
     try:
-        client = pymongo.MongoClient(MONGODB_CONFIG['host'], MONGODB_CONFIG['port'])
-        db = client[MONGODB_CONFIG['database']]
-        collection = db[MONGODB_CONFIG['collection']]
-        print("Connexion MongoDB établie")
-        return collection
+        client = pymongo.MongoClient(
+            MONGODB_CONFIG["host"],
+            MONGODB_CONFIG["port"]
+        )
+        db = client[MONGODB_CONFIG["database"]]
+        return db[MONGODB_CONFIG["collection"]]
     except Exception as e:
-        print(f"Erreur connexion MongoDB: {e}")
+        print(e)
         return None
 
+# Extraction from postgresSQL
 def extract_restaurant_data(pg_conn):
-    """Extraction et regroupement des données depuis PostgreSQL"""
     cursor = pg_conn.cursor()
-    
     query = """
     SELECT 
         m.restaurant_id,
@@ -61,121 +60,86 @@ def extract_restaurant_data(pg_conn):
     LEFT JOIN sql_feedback f ON m.restaurant_id = f.restaurant_id
     ORDER BY m.restaurant_id;
     """
-    
     try:
         cursor.execute(query)
         rows = cursor.fetchall()
-        print(f"✓ {len(rows)} restaurants extraits de PostgreSQL")
-        
         restaurants = []
         for row in rows:
-            restaurant = {
-                'restaurant_id': row[0],
-                'name': row[1],
-                'cuisine': row[2],
-                'borough': row[3],
-                'address': row[4] if row[4] else {},
-                'grades': row[5] if row[5] else []
-            }
-            restaurants.append(restaurant)
-        
+            restaurants.append({
+                "restaurant_id": row[0],
+                "name": row[1],
+                "cuisine": row[2],
+                "borough": row[3],
+                "address": row[4] if row[4] else {},
+                "grades": row[5] if row[5] else []
+            })
         cursor.close()
         return restaurants
-    
     except Exception as e:
-        print(f"✗ Erreur extraction données: {e}")
         cursor.close()
+        print(e)
         return []
-
-
+    
+# Transformations
 def transform_document(restaurant):
-    """Transformation optionnelle du document"""
-    if 'grades' in restaurant and restaurant['grades']:
-        for grade in restaurant['grades']:
-            if 'date' in grade and isinstance(grade['date'], str):
+    if restaurant.get("grades"):
+        for grade in restaurant["grades"]:
+            if isinstance(grade.get("date"), str):
                 try:
-                    grade['date'] = datetime.fromisoformat(grade['date'])
-                except:
+                    grade["date"] = datetime.fromisoformat(grade["date"])
+                except ValueError:
                     pass
     return restaurant
 
+# chargement
 def load_to_mongodb(collection, restaurants):
-    """Chargement des documents dans MongoDB"""
     try:
-        transformed_restaurants = [transform_document(r) for r in restaurants]
-        if transformed_restaurants:
-            result = collection.insert_many(transformed_restaurants)
-            print(f"✓ {len(result.inserted_ids)} documents insérés dans MongoDB")
-            return True
-        else:
-            print("✗ Aucun document à insérer")
+        operations = []
+        for restaurant in restaurants:
+            restaurant = transform_document(restaurant)
+            operations.append(
+                UpdateOne(
+                    {"restaurant_id": restaurant["restaurant_id"]},
+                    {"$set": restaurant},
+                    upsert=True
+                )
+            )
+        if not operations:
             return False
+        collection.bulk_write(operations)
+        return True
     except Exception as e:
-        print(f"✗ Erreur insertion MongoDB: {e}")
+        print(e)
         return False
 
-
 def verify_migration(pg_conn, mongo_collection):
-    """Vérification de la migration"""
     cursor = pg_conn.cursor()
-    
     cursor.execute("SELECT COUNT(*) FROM sql_main")
     pg_count = cursor.fetchone()[0]
-    
     mongo_count = mongo_collection.count_documents({})
-    
     cursor.close()
-    
-    print("\n=== Vérification de la migration ===")
-    print(f"Restaurants dans PostgreSQL: {pg_count}")
-    print(f"Documents dans MongoDB: {mongo_count}")
-    
-    if pg_count == mongo_count:
-        print("✓ Migration réussie - Les nombres correspondent")
-    else:
-        print("⚠ Attention - Les nombres ne correspondent pas")
-    
+    print(pg_count, mongo_count)
 
 def main():
-    """Fonction principale de migration"""
-    print("=== Début de la migration PostgreSQL → MongoDB ===\n")
-    
     pg_conn = connect_postgres()
     mongo_collection = connect_mongodb()
-    
-    # ⚡ Correction : on compare explicitement à None pour MongoDB
+
     if pg_conn is None or mongo_collection is None:
-        print("✗ Impossible de continuer sans connexions")
         return
-    
+
+    mongo_collection.create_index("restaurant_id", unique=True)
+
     try:
-        print("\n--- Étape 1: Extraction ---")
         restaurants = extract_restaurant_data(pg_conn)
-        
         if not restaurants:
-            print("✗ Aucune donnée à migrer")
             return
-        
-       
-        
-        print("\n--- Étape 3: Chargement MongoDB ---")
-        # mongo_collection.delete_many({})  # Décommenter si tu veux vider la collection
-        
         success = load_to_mongodb(mongo_collection, restaurants)
-        
         if success:
-            print("\n--- Étape 4: Vérification ---")
+            print("ok")
             verify_migration(pg_conn, mongo_collection)
-        
-        print("\n=== Migration terminée ===")
-    
-    except Exception as e:
-        print(f"\n✗ Erreur durant la migration: {e}")
-    
     finally:
-        if pg_conn:
-            pg_conn.close()
-            print("\n✓ Connexion PostgreSQL fermée")
+        pg_conn.close()
 
 if __name__ == "__main__":
     main()
+"10.3.124.4"
