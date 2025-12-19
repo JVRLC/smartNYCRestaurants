@@ -1,29 +1,29 @@
 {
-  "{'longitude': -74.0, 'latitude': 41.1, 'cuisine_filter': None, 'k': 5}": [
+  "{'longitude': -74.13, 'latitude': 40.6, 'cuisine_filter': None, 'k': 5}": [
     {
-      "name": "Nonis Coffee Shop",
-      "distance": 22.88314390834124,
-      "cuisine": "American "
+      "name": "Starbucks Coffee",
+      "distance": 1.3755109961457042,
+      "cuisine": "Caf\u00e9/Coffee/Tea"
     },
     {
-      "name": "Dino S Pizza",
-      "distance": 23.203174074804746,
+      "name": "Cool Ice",
+      "distance": 1.4345048078880664,
+      "cuisine": "Ice Cream, Gelato, Yogurt, Ices"
+    },
+    {
+      "name": "Dairy Palace",
+      "distance": 1.4475332311784068,
       "cuisine": "Pizza"
     },
     {
-      "name": "The Barbecue Pit",
-      "distance": 23.28894315112152,
-      "cuisine": "Barbecue"
-    },
-    {
-      "name": "Short Stop Restaurant",
-      "distance": 24.89495954369936,
+      "name": "Jimmy Max Restaurant",
+      "distance": 1.9260232325339206,
       "cuisine": "American "
     },
     {
-      "name": "Angelica S Bakery",
-      "distance": 24.93769223301557,
-      "cuisine": "Bakery"
+      "name": "Carol S Cafe",
+      "distance": 2.6104242370443886,
+      "cuisine": "Italian"
     }
   ]
 }
