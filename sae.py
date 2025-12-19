@@ -2,8 +2,16 @@ import os
 import json
 import time
 from pymongo import MongoClient
+from dotenv import load_dotenv
+# Charger les variables d'environnement depuis le fichier .env
+load_dotenv()
 
-
+MONGODB_CONFIG = {
+    'host': os.getenv('MONGO_HOST'),
+    'port': 27017,
+    'database': os.getenv('MONGO_DB'),
+    'collection': os.getenv('COLLECTION_NAME')
+}
 # Connexion à MongoDB
 client = MongoClient()
 try:
@@ -12,9 +20,9 @@ try:
         port_str = input("Veuillez entrer le port du serveur MongoDB [27017]: ").strip()
 
         if host == "":
-            host = "localhost"
+            host = MONGODB_CONFIG['host']
         if port_str == "":
-            port = 27017
+            port = MONGODB_CONFIG['port']
         else:
             try:
                 port = int(port_str)
