@@ -28,7 +28,7 @@ MONGODB_CONFIG = {
     "host": os.getenv("MONGO_HOST"),
     "port": int(os.getenv("MONGO_PORT", 27017)),  # Default MongoDB port
     "database": os.getenv("MONGO_DB"),
-    "collection": os.getenv("COLLECTION_NAME")
+    "collection": "restaurants"  # Force collection name to 'restaurants'
 }
 
 # CONNECTION FUNCTIONS
