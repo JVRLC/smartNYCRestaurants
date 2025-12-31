@@ -38,7 +38,19 @@ Ce projet permet de rechercher les restaurants les plus proches à New York selo
 
 ## Utilisation
 
-1. Lancez le script principal :
+### Crée aussi la table cahe
+```
+CREATE TABLE cache (
+    id SERIAL PRIMARY KEY,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    k INTEGER,
+    cuisine_filter TEXT,
+    results JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+```. Lancez le script principal :
    ```bash
    python sae.py
    ```
