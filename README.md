@@ -38,7 +38,7 @@ Ce projet permet de rechercher les restaurants les plus proches à New York selo
 
 ## Utilisation
 
-### Crée aussi la table cahe
+### Crée aussi la table cache
 ```
 CREATE TABLE cache (
     id SERIAL PRIMARY KEY,
