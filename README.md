@@ -38,7 +38,7 @@ Ce projet permet de rechercher les restaurants les plus proches à New York selo
 
 ## Utilisation
 
-### Crée aussi la table cache
+### Crée la table cache
 ```
 CREATE TABLE cache (
     id SERIAL PRIMARY KEY,
@@ -50,7 +50,8 @@ CREATE TABLE cache (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-```. Lancez le script principal :
+```
+### Lancez le script principal :
    ```bash
    python sae.py
    ```
