@@ -24,9 +24,31 @@ ENV/
 .vscode/
 .idea/
 
-.DS_Store
-
 # Logs
 *.log
 logs/
+
+# Fichiers LaTeX temporaires et de compilation
+rapport/*.aux
+rapport/*.log
+rapport/*.nav
+rapport/*.out
+rapport/*.snm
+rapport/*.toc
+rapport/*.vrb
+rapport/*.fls
+rapport/*.fdb_latexmk
+rapport/*.synctex.gz
+rapport/*.blg
+rapport/*.bbl
+
+# PDF généré
+rapport/*.pdf
+
+# Fichiers système inutiles
+.DS_Store
+Thumbs.db
+
+# Fichiers d'environnement
+.env
 

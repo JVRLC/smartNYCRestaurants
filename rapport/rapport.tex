@@ -1,0 +1,303 @@
+\documentclass{beamer}
+%\documentclass[aspectratio=169]{beamer} % Utiliser ratio 16:9
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{hyperref}
+
+% Autres packages
+\usepackage{latexsym,amsmath,xcolor,multicol,booktabs,calligra}
+\usepackage{graphicx,pstricks,listings,stackengine}
+
+\author{Serigne MBAYE, Aurel Vehi}
+\title{Migration d’un catalogue de restaurants de PostgreSQL vers MongoDB}
+\subtitle{Optimisation via un cache}
+\institute{BUT Science des Données}
+\date{\today}
+
+% Ajout du logo sous la date sur la page de titre
+\usepackage{CNU}
+
+% Définitions
+\def\cmd#1{\texttt{\color{red}\footnotesize $\backslash$#1}}
+\def\env#1{\texttt{\color{blue}\footnotesize #1}}
+\definecolor{deepblue}{rgb}{0,0,0.5}
+\definecolor{deepred}{rgb}{0.6,0,0}
+\definecolor{deepgreen}{rgb}{0,0.5,0}
+\definecolor{halfgray}{gray}{0.55}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\bfseries\color{deepblue},
+    emphstyle=\ttfamily\color{deepred},
+    stringstyle=\color{deepgreen},
+    numbers=left,
+    numberstyle=\small\color{halfgray},
+    rulesepcolor=\color{red!20!green!20!blue!20},
+    frame=shadowbox,
+}
+
+\begin{document}
+\setbeamertemplate{caption}[numbered]
+
+\begin{frame}
+    \titlepage
+    % Ajout du logo juste sous la date, bien visible
+    \vspace{0.1cm}
+    \begin{center}
+        \includegraphics[width=0.28\textwidth]{Logo-couple-IUT-horizontal-CMJN-05-07-1-1024x415.jpg}
+    \end{center}
+    % Lien GitHub retiré de la page de garde
+\end{frame}
+
+\begin{frame}
+    \tableofcontents[sectionstyle=show,subsectionstyle=show/shaded/hide,subsubsectionstyle=show/shaded/hide]
+\end{frame}
+
+
+\section{Introduction}
+
+\subsection{Présentation}
+
+\begin{frame}{Présentation}
+Dans le cadre de cette SAE, nous avons développé une application pour \textbf{exploiter}, \textbf{transformer} et \textbf{optimiser} l’accès à des données provenant de deux types de stockage. Nous avons utilisé à la fois une base relationnelle et une base NoSQL afin de comparer leurs usages, formats et performances dans un contexte applicatif réel.
+\end{frame}
+
+\subsection{Objectifs et démarche}
+
+\begin{frame}{Objectifs et démarche}
+L’objectif principal est de concevoir une architecture permettant la conversion de données relationnelles vers des formats NoSQL, leur exploitation dans une application, l’optimisation des temps d’accès grâce à un mécanisme de cache, et la recherche efficace de restaurants selon différents critères.
+
+Pour cela :
+\begin{itemize}
+    \item Les données sont migrées de PostgreSQL vers MongoDB pour bénéficier de la flexibilité du modèle NoSQL.
+    \item L’application permet de rechercher des restaurants par nom, type de cuisine, quartier ou proximité géographique.
+    \item Un cache PostgreSQL optimise les temps de réponse lors de recherches répétées.
+    \item Des scripts Python assurent la conversion, l’intégration et l’exploitation des données.
+\end{itemize}
+
+\end{frame}
+
+\section{Bases de données}
+
+\subsection{PostgreSQL}
+
+\begin{frame}
+\frametitle{\small PostgreSQL : Structure et Schéma}
+La base de données relationnelle est stockée sous \textbf{PostgreSQL} et contient plusieurs tables, notamment \texttt{sql\_main}, \texttt{sql\_feedback} et \texttt{sql\_geo}. Ces tables sont reliées entre elles par des \textbf{jointures parfois complexes}, nécessaires pour combiner les données principales, géographiques et les retours utilisateurs. Afin de simplifier l’exploitation des données, ces tables sont regroupées et converties en un format \textbf{JSONB} à l’aide d’un script Python (\texttt{conversion.py}).
+
+\vspace{0.3cm}
+Un script SQL (\texttt{insert\_queries.sql}) permet de créer et remplir ces tables automatiquement avant la migration.
+
+\vspace{0.5cm}
+\begin{columns}
+    \column{0.33\textwidth}
+    \centering
+    \includegraphics[width=0.9\textwidth]{bd_postgresSql.png}
+    {\footnotesize\textit{Schéma des tables principales dans PostgreSQL}}
+    \column{0.33\textwidth}
+    \centering
+    \includegraphics[width=0.9\textwidth]{explPostgres.png}
+    {\footnotesize\textit{Exemple d'exploitation des données PostgreSQL}}
+    \column{0.33\textwidth}
+    \centering
+    \includegraphics[width=0.9\textwidth]{expl2PostgreSql.png}
+    {\footnotesize\textit{Autre exemple d'exploitation PostgreSQL}}
+\end{columns}
+\vspace{0.5cm}
+\end{frame}
+
+\subsection{MongoDB}
+
+\begin{frame}
+\frametitle{\small MongoDB : Structure et Exploitation}
+Après conversion, les données sont importées dans \textbf{MongoDB}, une base de données NoSQL orientée documents. Chaque restaurant est stocké sous forme de document JSON, ce qui permet une structure flexible et facilite les traitements analytiques et les requêtes complexes, notamment géospatiales.
+
+\vspace{0.5cm}
+\begin{columns}
+    \column{0.5\textwidth}
+    \centering
+    \includegraphics[width=0.9\textwidth]{mongoDb.png}
+    {\footnotesize\textit{Exemple d'exploitation des données MongoDB}}
+    \column{0.5\textwidth}
+    \centering
+    \includegraphics[width=0.9\textwidth]{exlMongoDb.png}
+    {\footnotesize\textit{Exemple de document stocké dans MongoDB}}
+\end{columns}
+\vspace{0.5cm}
+\end{frame}
+
+\subsection{Comparaison}
+
+\begin{frame}{PostgreSQL vs MongoDB}
+    \begin{itemize}
+        \item Relationnel vs Document
+        \item SQL vs NoSQL
+        \item ACID vs BASE
+        \item Jointures vs Dénormalisation
+    \end{itemize}
+\end{frame}
+
+\section{Migration}
+
+\begin{frame}{Script de conversion}
+    \begin{itemize}
+        \item Lecture des données PostgreSQL
+        \item Transformation en documents JSON
+        \item Insertion dans MongoDB
+        \item Validation des données
+    \end{itemize}
+\end{frame}
+
+
+\section{Application finale}
+
+\begin{frame}{Calcul de la distance géographique}
+Pour la recherche géolocalisée des restaurants, la distance entre deux points (latitude, longitude) est calculée à l’aide de la formule de Haversine. Cette méthode permet de déterminer la distance à vol d’oiseau entre deux coordonnées sur la sphère terrestre.
+
+\vspace{0.5cm}
+\large
+La formule utilisée est :
+\vspace{0.3cm}
+\[
+d = 2r \arcsin\left( \sqrt{ \sin^2\left( \frac{\Delta\varphi}{2} \right) + \cos(\varphi_1)\cos(\varphi_2)\sin^2\left( \frac{\Delta\lambda}{2} \right) } \right)
+\]
+\end{frame}
+
+\begin{frame}{Paramètres et justification}
+\large
+où :
+\vspace{0.2cm}
+\begin{itemize}
+    \item $d$ : distance entre les deux points (orthodromique)
+    \item $r$ : rayon de la Terre (environ 6371 km)
+    \item $\varphi_1$, $\varphi_2$ : latitudes en radians
+    \item $\Delta\varphi$ : différence des latitudes
+    \item $\Delta\lambda$ : différence des longitudes
+\end{itemize}
+\vspace{0.3cm}
+Cette méthode est utilisée car elle prend en compte la courbure de la Terre et fournit une estimation précise de la distance réelle entre deux points géographiques, contrairement à un simple calcul euclidien. Elle est donc adaptée pour filtrer efficacement les restaurants à proximité d’un point donné.
+
+\vspace{0.3cm}
+\href{https://en.wikipedia.org/wiki/Haversine_formula}{\textcolor{blue}{Plus d’explications sur la formule de Haversine (Wikipedia)}}
+\end{frame}
+
+
+
+\section{Scripts et application}
+
+\subsection{conversion.py}
+
+\begin{frame}{conversion.py : Conversion des données}
+Le script \texttt{conversion.py} permet de lire les tables \texttt{sql\_main}, \texttt{sql\_feedback} et \texttt{sql\_geo} depuis PostgreSQL, de les regrouper et de les convertir en documents JSONB. Il effectue les jointures nécessaires pour rassembler les informations principales, géographiques et les retours utilisateurs en un seul document par restaurant. Les documents JSONB ainsi créés sont ensuite prêts à être importés dans MongoDB pour une exploitation plus flexible.
+
+\vspace{0.5cm}
+\begin{center}
+    \includegraphics[width=0.7\textwidth]{resultConversionpy.png}
+    
+    {\footnotesize\textit{Exemple de résultat produit par conversion.py }}
+\end{center}
+\end{frame}
+
+\subsection{sae.py}
+
+\begin{frame}{sae.py : Application finale}
+Le script \texttt{sae.py} constitue le cœur applicatif du projet. Il propose une interface en ligne de commande permettant à l’utilisateur de :
+\begin{itemize}
+    \item Saisir une position géographique (latitude/longitude) pour la recherche.
+    \item Filtrer les restaurants par type de cuisine (ou tout afficher).
+    \item Calculer la distance entre la position de l’utilisateur et chaque restaurant grâce à la formule de Haversine.
+    \item Afficher les $k$ restaurants les plus proches selon le filtre choisi.
+    \item Utiliser un système de cache basé sur PostgreSQL pour accélérer les recherches répétées (stockage des résultats pour une même requête).
+    \item Interroger MongoDB pour obtenir les données si le résultat n’est pas en cache.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{sae.py : Fonctionnalités principales (suite)}
+\large
+\begin{itemize}
+    \item Gestion de la saisie utilisateur et des coordonnées.
+    \item Recherche et tri par distance.
+    \item Utilisation et mise à jour du cache PostgreSQL.
+    \item Affichage des résultats avec nom, distance et type de cuisine.
+\end{itemize}
+
+\vspace{0.5cm}
+\begin{center}
+    \includegraphics[width=0.7\textwidth]{explSaePy.png}
+    
+    {\footnotesize\textit{Illustration de l'exécution de sae.py (exemple de résultats affichés)}}
+\end{center}
+\end{frame}
+
+\subsection{Cache PostgreSQL}
+
+\begin{frame}[allowframebreaks]{Cache PostgreSQL}
+\large
+Le système de cache implémenté avec PostgreSQL permet d’optimiser les performances de l’application lors des recherches répétées. Lorsqu’une requête (coordonnées, nombre de résultats, type de cuisine) a déjà été effectuée récemment, le résultat est stocké dans une table dédiée (\texttt{cache}). Si la même requête est soumise à nouveau, le résultat est directement récupéré depuis PostgreSQL sans interroger MongoDB ni recalculer les distances.
+
+\vspace{0.3cm}
+\textbf{Fonctionnement du cache :}
+\begin{itemize}
+    \item Recherche dans la table \texttt{cache} si une entrée correspondante existe.
+    \item Si oui, affichage immédiat des résultats stockés (gain de temps).
+    \item Sinon, calcul classique (MongoDB + Haversine), puis insertion du résultat dans le cache.
+    \item \textbf{Gestion mémoire :} le cache est limité à 20 entrées pour éviter une surcharge mémoire. Si la limite est atteinte, la table est vidée avant d’insérer de nouveaux résultats.
+\end{itemize}
+
+\vspace{0.3cm}
+Ce mécanisme améliore significativement la réactivité de l’application pour les requêtes fréquentes ou répétées tout en maîtrisant l’utilisation de la mémoire côté PostgreSQL.
+
+\begin{center}
+    \includegraphics[width=0.8\textwidth]{explCache1.png}
+    
+    {\footnotesize\textit{Première exécution : temps d'exécution $\approx$ 0.125s (requête non présente dans le cache, calcul complet).}}
+\end{center}
+
+\begin{center}
+    \includegraphics[width=0.8\textwidth]{explCache2.png}
+    
+    {\footnotesize\textit{Seconde exécution : temps d'exécution $\approx$ 0.0034s (résultat récupéré directement depuis le cache PostgreSQL).}}
+\end{center}
+
+\vspace{0.3cm}
+\textbf{Commentaire :}  
+On constate que l’utilisation du cache permet de réduire drastiquement le temps de réponse pour une même requête utilisateur.  
+La première exécution nécessite l’accès à MongoDB et le calcul des distances, alors que la seconde lecture est quasi-instantanée grâce au cache.
+\end{frame}
+
+\section{Conclusion}
+
+\begin{frame}{Conclusion}
+Ce projet a permis de comparer les approches relationnelles et NoSQL pour le stockage et l’exploitation de données de restaurants. La migration automatisée, l’intégration dans MongoDB et l’optimisation des accès via le cache PostgreSQL ont montré l’intérêt de combiner ces technologies. Des pistes d’amélioration restent possibles, notamment sur la gestion des performances et l’enrichissement des fonctionnalités de l’application.
+\end{frame}
+
+\section{Références}
+
+\begin{frame}{Références}
+    \begin{thebibliography}{99}
+        \bibitem{mongodb}MongoDB Documentation
+        \emph{MongoDB Manual}
+        https://docs.mongodb.com
+        
+        \bibitem{psycopg}Psycopg2 Documentation
+        \emph{PostgreSQL adapter for Python}
+        https://www.psycopg.org
+
+        \bibitem{github}Projet sur GitHub
+        \emph{smartNYCRestaurants}
+        \href{https://github.com/JVRLC/smartNYCRestaurants}{https://github.com/JVRLC/smartNYCRestaurants}
+    \end{thebibliography}
+\end{frame}
+
+
+
+% Remplace "chemin/vers/image.png" par le chemin réel de ton fichier image.
+
+\begin{frame}
+    \begin{center}
+        {\Huge\calligra Merci ! \\ Démos et questions ?}
+    \end{center}
+\end{frame}
+
+\end{document}
