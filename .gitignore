@@ -42,8 +42,6 @@ rapport/*.synctex.gz
 rapport/*.blg
 rapport/*.bbl
 
-# PDF généré
-rapport/*.pdf
 
 # Fichiers système inutiles
 .DS_Store
