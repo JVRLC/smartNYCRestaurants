@@ -1,111 +1,136 @@
 import time
 import json
-from conversion import connect_postgres, connect_mongodb
+from math import radians, sin, cos, sqrt, atan2
+from conversion import get_pg_connection, get_mongo_coll
 
-def haversine(lon1, lat1, lon2, lat2):
-    from math import radians, sin, cos, sqrt, atan2
-    R = 6371
+# calcul de distance
+def calcul_distance(lat1, lon1, lat2, lon2):
+    R = 6371 # Rayon de la terre
     dlon = radians(lon2 - lon1)
     dlat = radians(lat2 - lat1)
     a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
 
-def get_user_coord():
-    lat_min, lat_max = 40.50, 41.20
-    long_min, long_max = -74.26, -73.20
+def demander_positions():
+    # Bornes pour New York
+    print("-- Veuillez entrer votre position actuelle --")
     while True:
         try:
-            lat = float(input("Latitude Sud-Nord (ex: 41.1): ").strip())
-            if not (lat_min <= lat <= lat_max):
-                print(f"[ERROR] Latitude hors intervalle [{lat_min}, {lat_max}]"); continue
-            break
-        except ValueError:
-            print("[ERROR] La latitude doit être un nombre.")
+            la = float(input("Latitude (ex: 40.7): "))
+            if 40.50 <= la <= 41.20:
+                break
+            print("Erreur: Latitude hors zone NY.")
+        except:
+            print("Entrez un nombre valide.")
+            
     while True:
         try:
-            lon = float(input("Longitude Ouest-Est (ex: -74.0): ").strip())
-            if not (long_min <= lon <= long_max):
-                print(f"[ERROR] Longitude hors intervalle [{long_min}, {long_max}]"); continue
-            break
-        except ValueError:
-            print("[ERROR] La longitude doit être un nombre.")
-    return lat, lon
+            lo = float(input("Longitude (ex: -73.9): "))
+            if -74.26 <= lo <= -73.20:
+                break
+            print("Erreur: Longitude hors zone NY.")
+        except:
+            print("Entrez un nombre valide.")
+    return la, lo
 
-def get_from_cache(pg_conn, lat, lon, k, cuisine_type):
-    cur = pg_conn.cursor()
-    cur.execute("SELECT latitude, longitude, k, cuisine_filter, results FROM cache")
-    for row in cur.fetchall():
-        if row[2] == k and row[3] == cuisine_type:
-            if abs(row[0] - lat) <= 0.001 and abs(row[1] - lon) <= 0.001:
-                return row[4]  # JSONB
+def verifier_cache(conn, lat, lon, k, cuisine):
+    cursor = conn.cursor()
+    # récupère pour comparer manuellement
+    cursor.execute("SELECT latitude, longitude, k, cuisine_filter, results FROM cache")
+    lignes = cursor.fetchall()
+    
+    for l in lignes:
+        # Si c'est les mêmes paramètres
+        if l[2] == k and l[3] == cuisine:
+            # On regarde si la position est très proche (diff de 0.001 max)
+            if abs(l[0] - lat) < 0.001 and abs(l[1] - lon) < 0.001:
+                return l[4]
     return None
 
-def update_cache(pg_conn, lat, lon, k, cuisine_type, results):
-    cur = pg_conn.cursor()
+def sauver_en_cache(conn, lat, lon, k, cuisine, data):
+    cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM cache")
-    count = cur.fetchone()[0]
-    # Si la table contient déjà 20 lignes, on la vide avant d'insérer la nouvelle entrée
-    if count >= 20:
-        cur.execute("TRUNCATE cache")
-    # Insertion de la nouvelle entrée dans le cache
-    cur.execute(
-        "INSERT INTO cache (latitude, longitude, k, cuisine_filter, results) VALUES (%s, %s, %s, %s, %s)",
-        (lat, lon, k, cuisine_type, json.dumps(results))
-    )
-    pg_conn.commit()
+    # Limite de 20 entrées 
+    if cur.fetchone()[0] >= 20:
+        cur.execute("DELETE FROM cache") 
+    
+    sql = "INSERT INTO cache (latitude, longitude, k, cuisine_filter, results) VALUES (%s, %s, %s, %s, %s)"
+    cur.execute(sql, (lat, lon, k, cuisine, json.dumps(data)))
+    conn.commit()
 
-def main():
-    pg_conn = connect_postgres()
-    if pg_conn is None:
-        print("[ERROR] PostgreSQL connection failed. Exiting.")
+def recherche_restos():
+    db_sql = get_pg_connection()
+    coll_mongo = get_mongo_coll()
+    
+    if db_sql is None or coll_mongo is None:
         return
-    collection = connect_mongodb()
-    cuisines = collection.distinct("cuisine")
-    lat, lon = get_user_coord()
-    cuisine_input = input("Type de cuisine recherché (laisser vide pour tout): ").strip()
-    cuisine_type = cuisine_input if cuisine_input else None
-    found = False
-    for cuisine in cuisines:
-        if cuisine_type and cuisine.lower() == cuisine_type.lower():
-            cuisine_type = cuisine
-            found = True
+
+    # utilisateur
+    ma_lat, ma_lon = demander_positions()
+    pref = input("Type de cuisine (laisser vide pour tout) : ").strip()
+    
+    #  si la cuisine existe ? dans la base
+    liste_cuisines = coll_mongo.distinct("cuisine")
+    cuisine_ok = None
+    for c in liste_cuisines:
+        if pref.lower() == c.lower():
+            cuisine_ok = c
             break
-    if cuisine_type and not found:
-        print("[WARNING] Type de cuisine inconnu, affichage sans préférence.")
-        cuisine_type = None
-    t0 = time.perf_counter()
-    k = 3 if cuisine_input and not found else 5
-    cached = get_from_cache(pg_conn, lat, lon, k, cuisine_type)
-    if cached:
-        user_results = json.loads(cached) if isinstance(cached, str) else cached
-        print("[INFO] Résultats depuis le cache PostgreSQL.")
-        for i, res in enumerate(user_results):
-            print(f"{i+1:>2}. {res['name']:<30} - {res['distance']:.2f} km | {res['cuisine']}")
-        elapsed = time.perf_counter() - t0
-        print(f"Temps d'exécution : {elapsed:.6f} secondes")
-        return
-    # Sinon, on interroge MongoDB, calcule, puis update_cache et affiche
-    restaus = collection.find({}, {'name': 1, 'address.coord': 1, 'cuisine': 1, '_id': 0})
-    distances = []
-    for r in restaus:
-        try:
-            coords = r['address']['coord']['coordinates']
-            r_lat, r_lon = coords[1], coords[0]
-        except Exception:
-            continue
-        if cuisine_type and r.get('cuisine', '').lower() != cuisine_type.lower():
-            continue
-        d = haversine(lon, lat, r_lon, r_lat)
-        distances.append({'name': r.get('name', 'Unknown'), 'distance': d, 'cuisine': r.get('cuisine', 'Unknown')})
-    distances.sort(key=lambda x: x['distance'])
-    print(f"\nLes {k} restaurants les plus proches :")
-    user_results = distances[:k]
-    for i, res in enumerate(user_results):
-        print(f"{i+1:>2}. {res['name']:<30} - {res['distance']:.2f} km | {res['cuisine']}")
-    update_cache(pg_conn, lat, lon, k, cuisine_type, user_results)
-    elapsed = time.perf_counter() - t0
-    print(f"\nTemps d'exécution : {elapsed:.6f} secondes")
+            
+    if pref and not cuisine_ok:
+        print("!!! Cuisine non trouvée, recherche globale lancée.")
+    
+    # Détermination du nombre de résultats (k)
+    nb_k = 5
+    if pref and not cuisine_ok:
+        nb_k = 3 # Petite règle perso
+
+    start_time = time.perf_counter()
+
+    # 2. On regarde si on a déjà fait cette recherche
+    en_cache = verifier_cache(db_sql, ma_lat, ma_lon, nb_k, cuisine_ok)
+    
+    if en_cache:
+        resultats = json.loads(en_cache) if isinstance(en_cache, str) else en_cache
+        print("\n[CACHE] Résultats trouvés en mémoire locale :")
+    else:
+        # 3. Sinon calcul complet avec Mongo
+        print("\n base de mongo demandée, Calcul des distances en cours...")
+        tous_restos = coll_mongo.find({}, {"name": 1, "address.coord": 1, "cuisine": 1})
+        
+        liste_distances = []
+        for r in tous_restos:
+            try:
+                # Extraction des coordonnées Mongo
+                coords = r['address']['coord']['coordinates']
+                r_lat, r_lon = coords[1], coords[0]
+                
+                # Filtre cuisine
+                if cuisine_ok and r.get('cuisine') != cuisine_ok:
+                    continue
+                
+                dist = calcul_distance(ma_lat, ma_lon, r_lat, r_lon)
+                liste_distances.append({
+                    'name': r.get('name', 'Sans nom'),
+                    'distance': dist,
+                    'cuisine': r.get('cuisine', 'N/A')
+                })
+            except:
+                continue # On ignore les restos sans coordonnées valides
+
+        
+        liste_distances.sort(key=lambda x: x['distance'])
+        resultats = liste_distances[:nb_k]
+        
+        # On sauvegarde pour la prochaine fois
+        sauver_en_cache(db_sql, ma_lat, ma_lon, nb_k, cuisine_ok, resultats)
+
+    for i, res in enumerate(resultats, 1):
+        print(f"{i}. {res['name']} - {round(res['distance'], 2)} km ({res['cuisine']})")
+
+    diff = time.perf_counter() - start_time
+    print(f"\nTerminé en {diff:.4f} secondes.")
 
 if __name__ == "__main__":
-    main()
+    recherche_restos()
